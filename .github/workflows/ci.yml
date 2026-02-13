@@ -33,7 +33,7 @@ jobs:
           pytest tests/ -v --cov=app --cov=model --cov-report=term-missing --cov-report=xml
 
       - name: Upload coverage report
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           file: ./coverage.xml
         continue-on-error: true
@@ -69,7 +69,7 @@ jobs:
           "
 
       - name: Upload trained model artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: trained-model
           path: model/saved_model.pkl
