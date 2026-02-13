@@ -139,9 +139,13 @@ class TestAPI:
         assert response.status_code == 200
 
     def test_predict_valid_input(self, client):
-        response = client.post("/predict", json={
-            "features": [0.1, -0.5, 1.2, 0.3, -0.8, 0.6, -0.2, 0.9, -0.4, 0.7]
-        })
+        # 19 features = colonnes du dataset Telco Churn après encodage
+        # (gender, SeniorCitizen, Partner, Dependents, tenure, PhoneService,
+        #  MultipleLines, InternetService, OnlineSecurity, OnlineBackup,
+        #  DeviceProtection, TechSupport, StreamingTV, StreamingMovies,
+        #  Contract, PaperlessBilling, PaymentMethod, MonthlyCharges, TotalCharges)
+        features_telco = [1, 0, 1, 0, 12, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 2, 65.5, 780.0]
+        response = client.post("/predict", json={"features": features_telco})
         assert response.status_code == 200, f"Erreur: {response.json()}"
         data = response.json()
         assert "prediction" in data
