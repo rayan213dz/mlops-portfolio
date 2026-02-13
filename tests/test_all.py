@@ -9,7 +9,8 @@ from fastapi.testclient import TestClient
 import sys
 import os
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
 
 from app.monitoring import DriftDetector, MetricsLogger
 from model.train import generate_dataset, build_pipeline, evaluate_model, train_and_log
@@ -24,21 +25,19 @@ class TestDriftDetector:
         normal_features = [0.1, -0.2, 0.3, -0.1, 0.0]
         for _ in range(25):
             result = detector.check(normal_features)
-        assert result == False, "Pas de drift attendu sur données normales"
+        assert result == False
 
     def test_drift_on_anomalous_data(self):
         detector = DriftDetector(threshold=2.0)
         anomalous = [100.0, 95.0, 88.0, 102.0, 97.0]
         results = [detector.check(anomalous) for _ in range(30)]
-        assert any(results), "Drift attendu sur données aberrantes"
+        assert any(results)
 
     def test_report_structure(self):
         detector = DriftDetector()
         report = detector.get_report()
-        assert "drift_count" in report
-        assert "total_requests" in report
-        assert "drift_rate_pct" in report
-        assert "status" in report
+        for key in ["drift_count", "total_requests", "drift_rate_pct", "status"]:
+            assert key in report
 
     def test_window_size_respected(self):
         detector = DriftDetector(window_size=10)
@@ -50,23 +49,23 @@ class TestDriftDetector:
 class TestMetricsLogger:
 
     def test_log_and_retrieve(self):
-        logger = MetricsLogger()
-        logger.log(1.0, 42.5, False)
-        logger.log(0.0, 38.1, True)
-        summary = logger.get_summary()
+        ml = MetricsLogger()
+        ml.log(1.0, 42.5, False)
+        ml.log(0.0, 38.1, True)
+        summary = ml.get_summary()
         assert summary["request_count"] == 2
         assert summary["latency_ms"]["mean"] == pytest.approx(40.3, abs=0.1)
 
     def test_empty_logger(self):
-        logger = MetricsLogger()
-        summary = logger.get_summary()
+        ml = MetricsLogger()
+        summary = ml.get_summary()
         assert summary["request_count"] == 0
 
     def test_drift_rate(self):
-        logger = MetricsLogger()
-        logger.log(1.0, 10.0, True)
-        logger.log(0.0, 10.0, False)
-        summary = logger.get_summary()
+        ml = MetricsLogger()
+        ml.log(1.0, 10.0, True)
+        ml.log(0.0, 10.0, False)
+        summary = ml.get_summary()
         assert summary["drift_alert_rate_pct"] == 50.0
 
 
@@ -106,30 +105,34 @@ class TestModel:
             assert 0.0 <= metrics[key] <= 1.0
 
     def test_accuracy_above_threshold(self):
-        """Le modèle doit être meilleur que random (>55%)."""
         X, y = generate_dataset(1000)
         pipeline = build_pipeline("gradient_boosting")
         from sklearn.model_selection import train_test_split
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
         pipeline.fit(X_train, y_train)
         metrics = evaluate_model(pipeline, X_test, y_test)
-        assert metrics["accuracy"] > 0.55, f"Accuracy trop faible: {metrics['accuracy']}"
+        assert metrics["accuracy"] > 0.55
 
 
 # ─── Tests API (intégration) ─────────────────────────────────────────
 
-class TestAPI:
+@pytest.fixture(scope="module")
+def client():
+    """
+    Client de test avec lifespan activé (charge le modèle comme en prod).
+    scope="module" = un seul client pour tous les tests API, plus rapide.
+    """
+    from app.main import app
+    with TestClient(app) as c:
+        yield c
 
-    @pytest.fixture
-    def client(self):
-        from app.main import app
-        return TestClient(app)
+
+class TestAPI:
 
     def test_health_endpoint(self, client):
         response = client.get("/health")
         assert response.status_code == 200
-        data = response.json()
-        assert data["status"] == "healthy"
+        assert response.json()["status"] == "healthy"
 
     def test_root_endpoint(self, client):
         response = client.get("/")
@@ -139,7 +142,7 @@ class TestAPI:
         response = client.post("/predict", json={
             "features": [0.1, -0.5, 1.2, 0.3, -0.8, 0.6, -0.2, 0.9, -0.4, 0.7]
         })
-        assert response.status_code == 200
+        assert response.status_code == 200, f"Erreur: {response.json()}"
         data = response.json()
         assert "prediction" in data
         assert "confidence" in data

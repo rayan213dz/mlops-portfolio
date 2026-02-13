@@ -3,22 +3,19 @@ MLOps Portfolio - API de prédiction avec monitoring
 Auteur: [Ton Prénom Nom]
 """
 
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-import mlflow
-import mlflow.sklearn
+from pydantic import BaseModel, ConfigDict
 import numpy as np
-import pandas as pd
-import json
 import time
 from datetime import datetime
 from typing import Optional
 import logging
-import os
-
-import sys, os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.monitoring import DriftDetector, MetricsLogger
 from model.train import load_or_train_model
@@ -26,10 +23,21 @@ from model.train import load_or_train_model
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Chargement du modèle au démarrage (lifespan = syntaxe moderne FastAPI)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global model
+    logger.info("Chargement du modèle...")
+    model = load_or_train_model()
+    logger.info("Modèle prêt ✓")
+    yield
+    logger.info("Shutdown.")
+
 app = FastAPI(
     title="MLOps Portfolio API",
     description="Pipeline MLOps complet : entraînement, déploiement, monitoring de drift",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 app.add_middleware(
@@ -39,17 +47,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Chargement du modèle au démarrage
 model = None
 drift_detector = DriftDetector()
 metrics_logger = MetricsLogger()
-
-@app.on_event("startup")
-async def startup_event():
-    global model
-    logger.info("Chargement du modèle...")
-    model = load_or_train_model()
-    logger.info("Modèle prêt ✓")
 
 
 # --- Schémas Pydantic ---
@@ -59,6 +59,8 @@ class PredictionInput(BaseModel):
     request_id: Optional[str] = None
 
 class PredictionOutput(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     prediction: float
     confidence: float
     model_version: str
@@ -99,10 +101,8 @@ def predict(input_data: PredictionInput, background_tasks: BackgroundTasks):
     start = time.time()
     features = np.array(input_data.features).reshape(1, -1)
 
-    # Prédiction
     prediction = float(model.predict(features)[0])
-    
-    # Confiance (probabilité si classifieur, sinon score normalisé)
+
     try:
         proba = model.predict_proba(features)[0]
         confidence = float(max(proba))
@@ -110,8 +110,6 @@ def predict(input_data: PredictionInput, background_tasks: BackgroundTasks):
         confidence = 0.95
 
     latency = (time.time() - start) * 1000
-
-    # Détection de drift en arrière-plan
     drift_alert = drift_detector.check(input_data.features)
     background_tasks.add_task(metrics_logger.log, prediction, latency, drift_alert)
 
@@ -128,7 +126,6 @@ def predict(input_data: PredictionInput, background_tasks: BackgroundTasks):
 def train_model(request: TrainRequest):
     """Lance un entraînement et log les métriques dans MLflow."""
     from model.train import train_and_log  # noqa: F811
-    
     result = train_and_log(
         n_samples=request.n_samples,
         experiment_name=request.experiment_name
