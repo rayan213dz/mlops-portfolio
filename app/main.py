@@ -17,6 +17,9 @@ from typing import Optional
 import logging
 import os
 
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from app.monitoring import DriftDetector, MetricsLogger
 from model.train import load_or_train_model
 
@@ -124,7 +127,7 @@ def predict(input_data: PredictionInput, background_tasks: BackgroundTasks):
 @app.post("/train")
 def train_model(request: TrainRequest):
     """Lance un entraînement et log les métriques dans MLflow."""
-    from model.train import train_and_log
+    from model.train import train_and_log  # noqa: F811
     
     result = train_and_log(
         n_samples=request.n_samples,

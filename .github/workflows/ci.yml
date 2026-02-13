@@ -24,9 +24,11 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          pip install pytest pytest-cov
+          pip install pytest pytest-cov httpx
 
       - name: Run tests with coverage
+        env:
+          PYTHONPATH: ${{ github.workspace }}
         run: |
           pytest tests/ -v --cov=app --cov=model --cov-report=term-missing --cov-report=xml
 
@@ -53,17 +55,17 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Train model
-        run: python -c "from model.train import train_and_log; metrics = train_and_log(); print('Metrics:', metrics)"
-
-      - name: Validate model performance
+      - name: Train & validate model
+        env:
+          PYTHONPATH: ${{ github.workspace }}
         run: |
           python -c "
           from model.train import train_and_log
           metrics = train_and_log()
-          assert metrics['accuracy'] > 0.70, f'Accuracy insuffisante: {metrics[\"accuracy\"]}'
-          assert metrics['roc_auc'] > 0.75, f'AUC insuffisant: {metrics[\"roc_auc\"]}'
-          print('✅ Modèle validé — Accuracy:', metrics['accuracy'], '| AUC:', metrics['roc_auc'])
+          print('Metrics:', metrics)
+          assert metrics['accuracy'] > 0.70, f'Accuracy trop faible: {metrics[\"accuracy\"]}'
+          assert metrics['roc_auc'] > 0.75, f'AUC trop faible: {metrics[\"roc_auc\"]}'
+          print('Modele valide — Accuracy:', metrics['accuracy'], '| AUC:', metrics['roc_auc'])
           "
 
       - name: Upload trained model artifact
@@ -91,7 +93,4 @@ jobs:
         run: docker build -t mlops-portfolio:${{ github.sha }} .
 
       - name: Deploy notification
-        run: |
-          echo "🚀 Deploy prêt pour le commit ${{ github.sha }}"
-          echo "Image: mlops-portfolio:${{ github.sha }}"
-          echo "Pour déployer sur Railway/Render, connecte ton repo directement."
+        run: echo "Build Docker OK pour le commit ${{ github.sha }}"
