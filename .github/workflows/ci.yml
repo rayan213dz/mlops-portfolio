@@ -1,0 +1,97 @@
+name: MLOps CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: 🧪 Tests & Qualité
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Run tests with coverage
+        run: |
+          pytest tests/ -v --cov=app --cov=model --cov-report=term-missing --cov-report=xml
+
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+        continue-on-error: true
+
+  train:
+    name: 🤖 Entraînement & Validation Modèle
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Train model
+        run: python -c "from model.train import train_and_log; metrics = train_and_log(); print('Metrics:', metrics)"
+
+      - name: Validate model performance
+        run: |
+          python -c "
+          from model.train import train_and_log
+          metrics = train_and_log()
+          assert metrics['accuracy'] > 0.70, f'Accuracy insuffisante: {metrics[\"accuracy\"]}'
+          assert metrics['roc_auc'] > 0.75, f'AUC insuffisant: {metrics[\"roc_auc\"]}'
+          print('✅ Modèle validé — Accuracy:', metrics['accuracy'], '| AUC:', metrics['roc_auc'])
+          "
+
+      - name: Upload trained model artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: trained-model
+          path: model/saved_model.pkl
+
+  deploy:
+    name: 🚀 Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [test, train]
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download model artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: trained-model
+          path: model/
+
+      - name: Build Docker image
+        run: docker build -t mlops-portfolio:${{ github.sha }} .
+
+      - name: Deploy notification
+        run: |
+          echo "🚀 Deploy prêt pour le commit ${{ github.sha }}"
+          echo "Image: mlops-portfolio:${{ github.sha }}"
+          echo "Pour déployer sur Railway/Render, connecte ton repo directement."
