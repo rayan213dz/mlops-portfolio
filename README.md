@@ -3,7 +3,7 @@
 > Projet démontrant une maîtrise complète du cycle de vie d'un modèle ML en production :
 > entraînement, déploiement, monitoring de drift et CI/CD automatisé.
 
-![CI/CD](https://github.com/TON_USERNAME/mlops-portfolio/actions/workflows/ci.yml/badge.svg)
+![CI/CD](https://github.com/Rayanmlk/mlops-portfolio/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/Python-3.11-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.109-green)
 ![MLflow](https://img.shields.io/badge/MLflow-2.10-orange)
