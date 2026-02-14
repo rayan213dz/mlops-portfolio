@@ -136,5 +136,5 @@ Couverture : DriftDetector, MetricsLogger, Pipeline ML, Endpoints API.
 ## 👤 Auteur
 
 **[Ton Prénom Nom]** — Étudiant M1 Data & IA
-- GitHub: [@TON_USERNAME](https://github.com/RayanMLKI)
-- LinkedIn: [ton-linkedin](https://www.linkedin.com/in/rayan-malki/)
+- GitHub: [@Rayanmlk](https://github.com/Rayanmlk)
+- LinkedIn: [rayan malki](https://www.linkedin.com/in/rayan-malki/)
